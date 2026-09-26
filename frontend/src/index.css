@@ -25,6 +25,7 @@ p { margin: 6px 0; }
 .small { font-size: 0.82rem; }
 .muted { color: var(--muted); }
 .danger-text { color: var(--danger); }
+.warn-text { color: var(--warn); }
 
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
 .card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }

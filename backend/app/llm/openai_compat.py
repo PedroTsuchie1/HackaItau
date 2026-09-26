@@ -11,7 +11,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.core.schemas.agent import LLMUsage
-from app.llm.provider import LLMResponse, Message, ToolSchema
+from app.llm.provider import LLMResponse, Message, RetryListener, ToolSchema
 
 
 class LLMError(Exception):
@@ -60,6 +60,7 @@ class OpenAICompatProvider:
         response_schema: type[BaseModel] | None = None,
         temperature: float = 0.0,
         tools: list[ToolSchema] | None = None,
+        on_retry: RetryListener | None = None,
     ) -> LLMResponse:
         if tools:
             raise LLMError("tool-calling dinâmico é P1; não habilitado")
@@ -73,7 +74,7 @@ class OpenAICompatProvider:
             body["response_format"] = {"type": "json_object"}
 
         started = time.monotonic()
-        resp = await self._post_with_retry(body)
+        resp = await self._post_with_retry(body, on_retry)
         latency = int((time.monotonic() - started) * 1000)
         if resp.status_code >= 400:
             raise LLMError(f"provider respondeu HTTP {resp.status_code}: {_error_detail(resp)}")
@@ -94,17 +95,23 @@ class OpenAICompatProvider:
             ),
         )
 
-    async def _post_with_retry(self, body: dict) -> httpx.Response:
+    async def _post_with_retry(self, body: dict, on_retry: RetryListener | None) -> httpx.Response:
         """Repete em 429/5xx (sobrecarga, rate limit) com backoff exponencial; outros erros voltam direto."""
         async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
             for attempt in range(self._max_retries):
                 try:
                     resp = await client.post(self._url, headers=self._headers, json=body)
-                except httpx.HTTPError:
+                except httpx.HTTPError as exc:
                     resp = None
-                if resp is not None and resp.status_code not in RETRYABLE_STATUS:
-                    return resp
-                await asyncio.sleep(self._backoff * 2**attempt)
+                    reason = type(exc).__name__
+                if resp is not None:
+                    if resp.status_code not in RETRYABLE_STATUS:
+                        return resp
+                    reason = f"HTTP {resp.status_code}: {_error_detail(resp, limit=120)}"
+                wait = self._backoff * 2**attempt
+                if on_retry is not None:
+                    on_retry(attempt + 1, wait, reason)
+                await asyncio.sleep(wait)
             try:
                 return await client.post(self._url, headers=self._headers, json=body)
             except httpx.HTTPError as exc:

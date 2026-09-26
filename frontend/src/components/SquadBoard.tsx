@@ -38,7 +38,7 @@ export function SquadBoard({ state, events, busy, onRun, onInput }: Props) {
 
       <div className="agents">
         {state.agents.map((a) => (
-          <AgentCard key={a.agent_id} agent={a} />
+          <AgentCard key={a.agent_id} agent={a} retry={pendingRetry(events, a.agent_id)} />
         ))}
       </div>
       {reopened.length > 0 && (
@@ -55,7 +55,18 @@ export function SquadBoard({ state, events, busy, onRun, onInput }: Props) {
   )
 }
 
-function AgentCard({ agent }: { agent: AgentCardState }) {
+/** Último LLM_RETRY do agente ainda não seguido de uma resposta do provider (LLM_CALLED). */
+function pendingRetry(events: CaseEvent[], agentId: string): CaseEvent | null {
+  let retry: CaseEvent | null = null
+  for (const e of events) {
+    if (e.agent_id !== agentId) continue
+    if (e.type === 'LLM_RETRY') retry = e
+    else if (e.type === 'LLM_CALLED' || e.type === 'AGENT_COMPLETED' || e.type === 'AGENT_STARTED') retry = null
+  }
+  return retry
+}
+
+function AgentCard({ agent, retry }: { agent: AgentCardState; retry: CaseEvent | null }) {
   return (
     <article className={`agent ${agent.status}`}>
       <header>
@@ -74,6 +85,12 @@ function AgentCard({ agent }: { agent: AgentCardState }) {
           </span>
         ))}
       </div>
+      {agent.status === 'running' && retry && (
+        <p className="small warn-text">
+          provider instável — tentativa {String(retry.payload.attempt)} em {String(retry.payload.wait_s)}s ·{' '}
+          {String(retry.payload.reason)}
+        </p>
+      )}
       {agent.summary && <p className="small">{agent.summary}</p>}
     </article>
   )
@@ -243,6 +260,8 @@ function summarize(e: CaseEvent): string {
     case 'PERMISSION_CHECKED':
     case 'PERMISSION_DENIED':
       return `${String(p.action)} ${String(p.resource_domain)}:${String(p.resource_key)}${p.allowed === false ? ` — ${String(p.reason)}` : ''}`
+    case 'LLM_RETRY':
+      return `tentativa ${String(p.attempt)} em ${String(p.wait_s)}s — ${String(p.reason)}`
     case 'LLM_CALLED': {
       if (p.ok === false) return `falhou: ${String(p.error)}`
       const u = p.usage as { model?: string; tokens_in?: number; tokens_out?: number; latency_ms?: number } | undefined

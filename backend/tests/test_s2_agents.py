@@ -27,7 +27,7 @@ class FakeProvider:
         self.queue = list(responses)
         self.calls: list[list[Message]] = []
 
-    async def complete(self, *, model, messages, response_schema=None, temperature=0.0, tools=None):
+    async def complete(self, *, model, messages, response_schema=None, temperature=0.0, tools=None, on_retry=None):
         assert not tools
         self.calls.append(messages)
         item = self.queue.pop(0)

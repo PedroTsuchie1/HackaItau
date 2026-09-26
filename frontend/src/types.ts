@@ -36,6 +36,7 @@ export type EventType =
   | 'SECURITY_EVENT'
   | 'TOOL_CALLED'
   | 'LLM_CALLED'
+  | 'LLM_RETRY'
   | 'GROUNDING_REJECTED'
   | 'AGENT_COMPLETED'
   | 'REVIEW_STARTED'
