@@ -262,6 +262,10 @@ function summarize(e: CaseEvent): string {
       return `${String(p.action)} ${String(p.resource_domain)}:${String(p.resource_key)}${p.allowed === false ? ` — ${String(p.reason)}` : ''}`
     case 'LLM_RETRY':
       return `tentativa ${String(p.attempt)} em ${String(p.wait_s)}s — ${String(p.reason)}`
+    case 'OUTPUT_REJECTED': {
+      const problems = Array.isArray(p.problems) ? (p.problems as unknown[]).map(String) : []
+      return `${p.retry ? 'devolvido ao modelo para correção' : 'rejeitado (falha)'}: ${problems.join(' | ')}`
+    }
     case 'LLM_CALLED': {
       if (p.ok === false) return `falhou: ${String(p.error)}`
       const u = p.usage as { model?: string; tokens_in?: number; tokens_out?: number; latency_ms?: number } | undefined
