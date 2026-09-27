@@ -21,7 +21,7 @@ from app.core.schemas.context import ExecutionContext
 from app.core.schemas.evidence import EvidenceBundle
 from app.core.schemas.outputs import OUTPUT_SCHEMAS
 from app.core.schemas.tools import ToolResult
-from app.llm.prompting import UNTRUSTED_RULES, render_evidence, render_schema, wrap_untrusted
+from app.llm.prompting import SCHEMA_RULES, UNTRUSTED_RULES, render_evidence, render_schema, render_skeleton, wrap_untrusted
 from app.llm.provider import Message
 
 
@@ -149,6 +149,7 @@ class BaseAgent:
         if task.rework is not None:
             sections.append(_rework_section(task.rework))
         sections.append("## Evidências disponíveis\n" + (render_evidence(evidence) or "(nenhuma)"))
+        out_schema = OUTPUT_SCHEMAS[card.output_schema]
         sections.append(
             "## IDs autorizados para citação (lista fechada do backend)\n"
             + ", ".join(sorted(evidence.allowed_ids()))
@@ -157,7 +158,11 @@ class BaseAgent:
         )
         sections.append(
             "## Formato de saída\nResponda apenas com JSON válido conforme este schema:\n"
-            + render_schema(OUTPUT_SCHEMAS[card.output_schema])
+            + render_schema(out_schema)
+            + "\n\nExemplo da forma exata esperada (substitua os valores de exemplo; respeite min/max de itens do schema):\n"
+            + render_skeleton(out_schema)
+            + "\n\n"
+            + SCHEMA_RULES
         )
         return PromptParts(system=system, user="\n\n".join(sections), response_schema=card.output_schema)
 

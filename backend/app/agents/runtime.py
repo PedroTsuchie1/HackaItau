@@ -192,6 +192,8 @@ class AgentRuntime:
 
         retries = 0
         usage = LLMUsage(model=self.model)
+        last_error = ""
+
         for attempt in range(2):
             started = time.monotonic()
             try:
@@ -231,19 +233,37 @@ class AgentRuntime:
                 return obj, usage
             except (ValueError, ValidationError) as exc:
                 retries += 1
+                last_error = _schema_error_summary(exc)
+                events.emit(
+                    EventType.OUTPUT_REJECTED,
+                    {"attempt": attempt + 1, "problems": [f"schema: {last_error}"], "retry": attempt == 0},
+                    agent_id=agent_id,
+                    task_id=task.task_id,
+                )
                 messages = messages + [
                     Message(role="assistant", content=resp.content or ""),
                     Message(
                         role="user",
-                        content=f"Sua resposta falhou na validação do schema: {_short(str(exc))}. "
-                        "Devolva SOMENTE o JSON corrigido, conforme o schema.",
+                        content=f"Sua resposta falhou na validação do schema: {last_error}. "
+                        "Devolva SOMENTE o JSON corrigido, com exatamente as chaves do schema.",
                     ),
                 ]
-        raise AgentExecutionError(agent_id, "schema_validation_failed_after_retry")
+        raise AgentExecutionError(agent_id, f"schema_validation_failed_after_retry: {_short(last_error, 300)}")
 
 
 def _short(text: str, limit: int = 600) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
+
+
+def _schema_error_summary(exc: ValueError | ValidationError, limit: int = 6) -> str:
+    """'alternatives.0.amount: Input should be a valid number; alternatives.1.score: Extra inputs are not permitted'."""
+    if not isinstance(exc, ValidationError):
+        return _short(str(exc), 200)
+    errors = exc.errors()
+    parts = [".".join(str(p) for p in e["loc"]) + ": " + e["msg"] for e in errors[:limit]]
+    if len(errors) > limit:
+        parts.append(f"(+{len(errors) - limit} erro(s))")
+    return "; ".join(parts)
 
 
 def _merge_usage(total: LLMUsage, call: LLMUsage) -> LLMUsage:

@@ -34,6 +34,50 @@ def render_schema(model: type[BaseModel]) -> str:
     return json.dumps(schema, ensure_ascii=False)
 
 
+def render_skeleton(model: type[BaseModel]) -> str:
+    """Exemplo com a forma exata do JSON esperado (chaves, tipos, aninhamento) derivado do schema.
+
+    Modelos pequenos seguem um exemplo concreto melhor do que JSON Schema; `additionalProperties: false`
+    vira "não adicione chaves".
+    """
+    schema = model.model_json_schema()
+    defs = schema.get("$defs", {})
+
+    def example(node: dict[str, Any]) -> Any:
+        if "$ref" in node:
+            return example(defs[node["$ref"].rsplit("/", 1)[-1]])
+        if "enum" in node:
+            return node["enum"][0]
+        if "const" in node:
+            return node["const"]
+        if "anyOf" in node:
+            options = [o for o in node["anyOf"] if o.get("type") != "null"]
+            return example(options[0]) if options else None
+        t = node.get("type")
+        if t == "object":
+            return {k: example(v) for k, v in node.get("properties", {}).items()}
+        if t == "array":
+            item = example(node.get("items", {}))
+            return [item] if item is not None else []
+        if t == "string":
+            return "texto"
+        if t == "integer":
+            return 0
+        if t == "number":
+            return 0.0
+        if t == "boolean":
+            return False
+        return None
+
+    return json.dumps(example(schema), ensure_ascii=False, indent=1)
+
+
+SCHEMA_RULES = """\
+Regras de formato: use exatamente as chaves do schema (não adicione, renomeie ou omita chaves obrigatórias); \
+números sem aspas, símbolos ou separadores (ex.: 50000000, não "R$ 50.000.000"); inteiros onde o schema pede \
+integer; listas sempre como arrays JSON, mesmo com um só item."""
+
+
 def render_evidence(bundle: EvidenceBundle) -> str:
     """Evidências compactas: id + dados já filtrados. Cada registro entra como untrusted."""
     parts: list[str] = []
