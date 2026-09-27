@@ -7,7 +7,14 @@ import pytest
 
 from app.core.schemas.outputs import EligibilityOutput, StructuringOutput
 from app.llm.openai_compat import LLMError, OpenAICompatProvider, SecretInPromptError
-from app.llm.prompting import UNTRUSTED_CLOSE, UNTRUSTED_OPEN, extract_json, render_schema, wrap_untrusted
+from app.llm.prompting import (
+    UNTRUSTED_CLOSE,
+    UNTRUSTED_OPEN,
+    extract_json,
+    render_schema,
+    render_skeleton,
+    wrap_untrusted,
+)
 from app.llm.provider import Message, ToolSchema
 
 KEY = "sk-test-SECRET-123"
@@ -114,3 +121,14 @@ def test_wrap_untrusted_and_extract_json():
         extract_json("sem json")
     schema = json.loads(render_schema(StructuringOutput))
     assert "alternatives" in schema["properties"]
+
+
+def test_render_skeleton_matches_schema_shape():
+    skeleton = json.loads(render_skeleton(StructuringOutput))
+    alt = skeleton["alternatives"][0]
+    assert set(alt) == set(StructuringOutput.model_json_schema()["$defs"]["Alternative"]["properties"])
+    assert isinstance(alt["amount"], float) and isinstance(alt["tenor_months"], int)
+    assert alt["guarantees"] == ["texto"] and skeleton["comparison_notes"] == "texto"
+    # o esqueleto (com 2 alternativas) é ele mesmo válido no schema — modelo pequeno só precisa preencher
+    skeleton["alternatives"].append(dict(alt))
+    StructuringOutput.model_validate(skeleton)

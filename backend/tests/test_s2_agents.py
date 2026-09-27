@@ -165,8 +165,18 @@ async def test_retry_once_on_invalid_json_then_fail_on_provider_error(registry, 
     with pytest.raises(AgentExecutionError, match="llm_unconfigured"):
         await _run(registry, toolbox_factory, analyst, scope_001, "agro_eligibility", None)
 
-    with pytest.raises(AgentExecutionError, match="schema_validation_failed_after_retry"):
+    with pytest.raises(AgentExecutionError, match="schema_validation_failed_after_retry: resposta sem objeto JSON"):
         await _run(registry, toolbox_factory, analyst, scope_001, "agro_eligibility", FakeProvider("x", "y"))
+
+
+async def test_schema_errors_are_specific_and_audited(registry, toolbox_factory, analyst, scope_001):
+    wrong = json.dumps({"status": "ready", "summary": "ok", "checklist": "não é lista"})  # falta product_fit
+    provider = FakeProvider(wrong, wrong)
+    with pytest.raises(AgentExecutionError) as exc:
+        await _run(registry, toolbox_factory, analyst, scope_001, "agro_eligibility", provider)
+    assert "product_fit: Field required" in exc.value.reason
+    assert "checklist: Input should be a valid list" in exc.value.reason
+    assert "product_fit: Field required" in provider.calls[1][-1].content  # feedback ao modelo aponta o campo
 
 
 RISK_LLM = json.dumps(
