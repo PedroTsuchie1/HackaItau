@@ -30,7 +30,7 @@ class FlakyProvider(StubProvider):
         self.on_call = on_call
         self.seen = 0
 
-    async def complete(self, *, model, messages, response_schema=None, temperature=0.0, tools=None):
+    async def complete(self, *, model, messages, response_schema=None, temperature=0.0, tools=None, on_retry=None):
         if response_schema is not None and response_schema.__name__ == self.fail_schema:
             self.seen += 1
             if self.seen == self.on_call:

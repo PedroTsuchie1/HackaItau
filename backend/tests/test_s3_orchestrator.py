@@ -122,7 +122,7 @@ async def test_eligibility_blocked_stops_before_risk_then_input_unblocks():
 
     # LLM tenta dizer "ready"; o status é decidido por CÓDIGO (política de documentos obrigatórios)
     class OptimisticProvider:
-        async def complete(self, *, model, messages, response_schema=None, temperature=0.0, tools=None):
+        async def complete(self, *, model, messages, response_schema=None, temperature=0.0, tools=None, on_retry=None):
             body = {
                 "status": "ready",
                 "product_fit": "credito_rural_custeio",

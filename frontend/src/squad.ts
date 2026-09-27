@@ -134,6 +134,8 @@ export function stepOf(e: CaseEvent): Step | null {
       return p.kind === 'SCOPE_VIOLATION_BLOCKED' ? null : step('security', SECURITY_LABEL[String(p.kind)] ?? String(p.kind), 'danger')
     case 'LLM_CALLED':
       return p.ok === false ? step('fail', 'O modelo não respondeu', 'danger') : step('llm', 'Analisou as evidências')
+    case 'LLM_RETRY':
+      return step('rejected', `Provedor instável (${String(p.reason)}); nova tentativa ${String(p.attempt)} em ${String(p.wait_s)}s`, 'warn')
     case 'OUTPUT_REJECTED':
       return step('rejected', p.retry ? 'Resposta fora do formato; devolvida ao modelo' : 'Resposta rejeitada pelo validador', 'warn')
     case 'GROUNDING_REJECTED':
@@ -166,6 +168,8 @@ export function currentActivity(last: CaseEvent | undefined): string {
     case 'LLM_CALLED':
     case 'OUTPUT_REJECTED':
       return 'Validando o resultado'
+    case 'LLM_RETRY':
+      return `Aguardando o provedor (tentativa ${String(last.payload.attempt)} em ${String(last.payload.wait_s)}s)`
     case 'REVIEW_STARTED':
       return 'Rodando os validadores'
     default:

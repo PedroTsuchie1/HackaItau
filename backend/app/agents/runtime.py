@@ -192,10 +192,21 @@ class AgentRuntime:
 
         retries = 0
         usage = LLMUsage(model=self.model)
+
+        def on_retry(attempt: int, wait: float, reason: str) -> None:
+            events.emit(
+                EventType.LLM_RETRY,
+                {"attempt": attempt, "wait_s": wait, "reason": reason},
+                agent_id=agent_id,
+                task_id=task.task_id,
+            )
+
         for attempt in range(2):
             started = time.monotonic()
             try:
-                resp = await self.provider.complete(model=self.model, messages=messages, response_schema=schema)
+                resp = await self.provider.complete(
+                    model=self.model, messages=messages, response_schema=schema, on_retry=on_retry
+                )
             except LLMError as exc:
                 events.emit(
                     EventType.LLM_CALLED,

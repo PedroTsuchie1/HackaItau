@@ -1,5 +1,6 @@
 """Abstração mínima de provider LLM (ARCHITECTURE.md §19.4). P0: um provider OpenAI-compatible, sem tools."""
 
+from collections.abc import Callable
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
@@ -34,6 +35,10 @@ class LLMResponse(BaseModel):
     usage: LLMUsage
 
 
+RetryListener = Callable[[int, float, str], None]
+"""(attempt, wait_seconds, reason) — chamado antes de cada nova tentativa em 429/5xx."""
+
+
 class LLMProvider(Protocol):
     async def complete(
         self,
@@ -43,4 +48,5 @@ class LLMProvider(Protocol):
         response_schema: type[BaseModel] | None = None,
         temperature: float = 0.0,
         tools: list[ToolSchema] | None = None,  # P1
+        on_retry: RetryListener | None = None,
     ) -> LLMResponse: ...

@@ -105,8 +105,12 @@ async def test_provider_retries_overload_then_succeeds():
             return httpx.Response(503, json=[{"error": {"message": "high demand", "code": 503}}])
         return ok(req)
 
-    resp = await _provider(flaky).complete(model="m", messages=[Message(role="user", content="hi")])
+    retries: list[tuple[int, float, str]] = []
+    resp = await _provider(flaky).complete(
+        model="m", messages=[Message(role="user", content="hi")], on_retry=lambda *a: retries.append(a)
+    )
     assert resp.content == '{"a": 1}' and len(calls) == 3
+    assert [r[0] for r in retries] == [1, 2] and all("high demand" in r[2] for r in retries)
 
 
 async def test_provider_does_not_retry_client_errors():

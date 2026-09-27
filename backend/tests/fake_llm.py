@@ -72,6 +72,7 @@ class StubProvider:
         response_schema: type[BaseModel] | None = None,
         temperature: float = 0.0,
         tools: list[Any] | None = None,
+        on_retry: Any = None,
     ) -> LLMResponse:
         assert not tools, "P0: sem tool-calling"
         self.calls.append(messages)
